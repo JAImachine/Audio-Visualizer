@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Audio Visualizer</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="stage" aria-label="오디오 비주얼라이저">
+        <canvas id="visualizer" aria-hidden="true"></canvas>
+
+        <aside class="settings-bar" aria-label="설정">
+          <button id="micButton" class="mic-button" type="button">마이크 시작</button>
+
+          <div class="global-control">
+            <label class="number-field">
+              <span>Boost</span>
+              <input id="boostScale" type="number" min="0" max="999" step="1" value="10" />
+            </label>
+            <label class="number-field">
+              <span>Ease</span>
+              <input id="easeScale" type="number" min="0" max="999" step="0.05" value="0.7" />
+            </label>
+            <label class="number-field">
+              <span>Amp</span>
+              <input id="amplitudeScale" type="number" min="0" max="999" step="0.1" value="1" />
+            </label>
+            <label class="number-field">
+              <span>Period</span>
+              <input id="periodScale" type="number" min="0.1" max="999" step="0.1" value="1" />
+            </label>
+          </div>
+
+          <div class="band-control">
+            <label class="color-field">
+              <span>Low</span>
+              <input id="lowPicker" type="color" value="#31d6a0" aria-label="Low color picker" />
+              <input id="lowHex" type="text" value="#31d6a0" aria-label="Low hex color" />
+            </label>
+            <label class="number-field">
+              <span>Width</span>
+              <input id="lowWidth" type="number" min="0" max="999" step="1" value="8" />
+            </label>
+          </div>
+
+          <div class="band-control">
+            <label class="color-field">
+              <span>Mid</span>
+              <input id="midPicker" type="color" value="#4da3ff" aria-label="Mid color picker" />
+              <input id="midHex" type="text" value="#4da3ff" aria-label="Mid hex color" />
+            </label>
+            <label class="number-field">
+              <span>Width</span>
+              <input id="midWidth" type="number" min="0" max="999" step="1" value="8" />
+            </label>
+          </div>
+
+          <div class="band-control">
+            <label class="color-field">
+              <span>High</span>
+              <input id="highPicker" type="color" value="#ff6f91" aria-label="High color picker" />
+              <input id="highHex" type="text" value="#ff6f91" aria-label="High hex color" />
+            </label>
+            <label class="number-field">
+              <span>Width</span>
+              <input id="highWidth" type="number" min="0" max="999" step="1" value="8" />
+            </label>
+          </div>
+        </aside>
+      </section>
+    </main>
+
+    <script src="./main.js"></script>
+  </body>
+</html>
