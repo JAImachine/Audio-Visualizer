@@ -1,8 +1,14 @@
 const canvas = document.querySelector("#visualizer");
 const ctx = canvas.getContext("2d", { alpha: false });
 const micButton = document.querySelector("#micButton");
+const settingsToggle = document.querySelector("#settingsToggle");
+const settingsBar = document.querySelector("#settingsBar");
+const fullscreenButton = document.querySelector("#fullscreenButton");
+const wakeLockButton = document.querySelector("#wakeLockButton");
 
 const POINT_COUNT = 128;
+const STORAGE_KEY = "audio-visualizer-settings";
+const mobileQuery = window.matchMedia("(max-width: 720px)");
 const visualSettings = {
   boost: 10,
   ease: 0.7,
@@ -124,6 +130,61 @@ let animationId;
 let stream;
 let isListening = false;
 let lastFrameAt = performance.now();
+let wakeLock;
+let wakeLockEnabled = false;
+
+function clampNumber(value, min = 0, max = 999) {
+  return Math.max(min, Math.min(max, Number(value) || 0));
+}
+
+function readStoredSettings() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+  } catch (error) {
+    return {};
+  }
+}
+
+function saveSettings() {
+  const payload = {
+    visual: visualSettings,
+    bands: Object.fromEntries(
+      Object.entries(bands).map(([name, band]) => [
+        name,
+        {
+          color: band.color,
+          width: band.width,
+        },
+      ]),
+    ),
+  };
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+}
+
+function applyStoredSettings() {
+  const stored = readStoredSettings();
+
+  Object.entries(stored.visual || {}).forEach(([name, value]) => {
+    if (name in visualSettings) {
+      visualSettings[name] = clampNumber(value, name === "period" ? 0.1 : 0);
+    }
+  });
+
+  Object.entries(stored.bands || {}).forEach(([name, settings]) => {
+    if (!bands[name]) {
+      return;
+    }
+
+    if (settings.color && isHexColor(formatHex(settings.color))) {
+      bands[name].color = formatHex(settings.color);
+    }
+
+    if (settings.width !== undefined) {
+      bands[name].width = clampNumber(settings.width);
+    }
+  });
+}
 
 function resizeCanvas() {
   const rect = canvas.getBoundingClientRect();
@@ -184,12 +245,14 @@ function setupColorControls() {
 
     controls.picker.addEventListener("input", () => {
       setBandColor(name, controls.picker.value);
+      saveSettings();
     });
 
     controls.hex.addEventListener("input", () => {
       const nextColor = formatHex(controls.hex.value);
       if (isHexColor(nextColor)) {
         setBandColor(name, nextColor);
+        saveSettings();
       } else {
         controls.hex.classList.add("is-invalid");
       }
@@ -209,8 +272,9 @@ function setupWidthControls() {
     controls.input.value = bands[name].width;
 
     controls.input.addEventListener("input", () => {
-      const nextWidth = Math.max(0, Math.min(999, Number(controls.input.value) || 0));
+      const nextWidth = clampNumber(controls.input.value);
       bands[name].width = nextWidth;
+      saveSettings();
     });
   });
 }
@@ -224,8 +288,9 @@ function setupGlobalControls() {
     controls.input.value = formatSliderValue(visualSettings[name]);
 
     controls.input.addEventListener("input", () => {
-      const nextValue = Math.max(0, Math.min(999, Number(controls.input.value) || 0));
+      const nextValue = clampNumber(controls.input.value, name === "period" ? 0.1 : 0);
       visualSettings[name] = nextValue;
+      saveSettings();
     });
   });
 }
@@ -233,11 +298,11 @@ function setupGlobalControls() {
 function getLineBounds() {
   const width = canvas.clientWidth;
   const height = canvas.clientHeight;
-  const leftUiSpace = width > 720 ? 288 : 32;
+  const leftUiSpace = width > 720 ? 288 : 24;
 
   return {
     startX: leftUiSpace,
-    endX: width - 48,
+    endX: width - (width > 720 ? 48 : 24),
     startY: height * 0.52,
     endY: height * 0.52,
   };
@@ -535,6 +600,85 @@ function stopMic() {
   drawFrame();
 }
 
+function setSettingsCollapsed(isCollapsed) {
+  document.body.classList.toggle("settings-collapsed", isCollapsed);
+  settingsToggle.setAttribute("aria-expanded", String(!isCollapsed));
+}
+
+function syncSettingsPanelForViewport() {
+  setSettingsCollapsed(mobileQuery.matches);
+}
+
+async function enterFullscreen() {
+  const element = document.documentElement;
+
+  if (document.fullscreenElement) {
+    await document.exitFullscreen();
+    return;
+  }
+
+  if (element.requestFullscreen) {
+    await element.requestFullscreen();
+  }
+}
+
+function updateFullscreenButton() {
+  fullscreenButton.textContent = document.fullscreenElement ? "창 모드" : "전체화면";
+  fullscreenButton.classList.toggle("is-active", Boolean(document.fullscreenElement));
+  resizeCanvas();
+}
+
+async function requestWakeLock() {
+  if (!("wakeLock" in navigator)) {
+    wakeLockButton.textContent = "미지원";
+    return;
+  }
+
+  try {
+    wakeLock = await navigator.wakeLock.request("screen");
+    wakeLockButton.textContent = "유지 중";
+    wakeLockButton.classList.add("is-active");
+    wakeLock.addEventListener("release", () => {
+      if (wakeLockEnabled && document.visibilityState === "visible") {
+        requestWakeLock();
+        return;
+      }
+
+      wakeLockButton.textContent = "화면 유지";
+      wakeLockButton.classList.remove("is-active");
+    });
+  } catch (error) {
+    wakeLockButton.textContent = "권한 필요";
+    setTimeout(() => {
+      wakeLockButton.textContent = "화면 유지";
+    }, 1400);
+  }
+}
+
+async function toggleWakeLock() {
+  wakeLockEnabled = !wakeLockEnabled;
+
+  if (!wakeLockEnabled) {
+    await wakeLock?.release();
+    wakeLock = null;
+    wakeLockButton.textContent = "화면 유지";
+    wakeLockButton.classList.remove("is-active");
+    return;
+  }
+
+  await requestWakeLock();
+}
+
+function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) {
+    return;
+  }
+
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js").catch(() => {});
+  });
+}
+
 micButton.addEventListener("click", async () => {
   if (isListening) {
     stopMic();
@@ -560,9 +704,39 @@ micButton.addEventListener("click", async () => {
   }
 });
 
+settingsToggle.addEventListener("click", () => {
+  setSettingsCollapsed(!document.body.classList.contains("settings-collapsed"));
+});
+
+settingsBar.addEventListener("click", (event) => {
+  event.stopPropagation();
+});
+
+fullscreenButton.addEventListener("click", async () => {
+  try {
+    await enterFullscreen();
+  } catch (error) {
+    fullscreenButton.textContent = "불가";
+    setTimeout(updateFullscreenButton, 1200);
+  }
+});
+
+wakeLockButton.addEventListener("click", toggleWakeLock);
+
+document.addEventListener("fullscreenchange", updateFullscreenButton);
+document.addEventListener("visibilitychange", () => {
+  if (wakeLockEnabled && document.visibilityState === "visible") {
+    requestWakeLock();
+  }
+});
+
 window.addEventListener("resize", resizeCanvas);
+mobileQuery.addEventListener("change", syncSettingsPanelForViewport);
+applyStoredSettings();
 setupColorControls();
 setupWidthControls();
 setupGlobalControls();
+syncSettingsPanelForViewport();
+registerServiceWorker();
 resizeCanvas();
 drawFrame();

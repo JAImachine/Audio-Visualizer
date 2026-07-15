@@ -3,16 +3,34 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#050608" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <title>Audio Visualizer</title>
+    <link rel="manifest" href="./manifest.json" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <main class="app-shell">
       <section class="stage" aria-label="오디오 비주얼라이저">
         <canvas id="visualizer" aria-hidden="true"></canvas>
+        <button
+          id="settingsToggle"
+          class="settings-toggle"
+          type="button"
+          aria-controls="settingsBar"
+          aria-expanded="true"
+          aria-label="설정 열고 닫기"
+        >
+          SET
+        </button>
 
-        <aside class="settings-bar" aria-label="설정">
+        <aside id="settingsBar" class="settings-bar" aria-label="설정">
           <button id="micButton" class="mic-button" type="button">마이크 시작</button>
+          <div class="utility-control">
+            <button id="fullscreenButton" class="utility-button" type="button">전체화면</button>
+            <button id="wakeLockButton" class="utility-button" type="button">화면 유지</button>
+          </div>
 
           <div class="global-control">
             <label class="number-field">
